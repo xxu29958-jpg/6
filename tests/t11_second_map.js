@@ -49,5 +49,5 @@ H.near(m.surfaceAt(120, 150).elevation, 0, 1e-9, 'Q 在 elev0');
 }
 
 /* 合法 hint 全过（compile 已含） */
-for (const e of m.edges ? m.nav.edges : []) WC.validation.validateRoute(m, e.routePts, e.id);
+for (const e of m.nav.edges) WC.validation.validateRoute(m, e.routePts, e.id);
 console.log('t11 second map fixture OK（core 零改动）');
