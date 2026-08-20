@@ -17,7 +17,7 @@ T.apply = function (t, lx, ly) {
 
 /* world → local（校验/调试回算用） */
 T.invert = function (t, wx, wy) {
-  const s = WC.transform.scaleOf(t);
+  const s = T.scaleOf(t);
   return { x: (t.flip ? -(wx - t.x) : (wx - t.x)) / s, y: (wy - t.y) / s };
 };
 

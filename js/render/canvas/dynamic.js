@@ -238,7 +238,6 @@ function updateDynamic(dt) {
     r.r += (r.pond ? 34 : 24) * dt;
     if (r.life > r.max) r.life = 0;
   }
-
   /* 环境小涟漪（鱼偶发啄水面：低频随机，不限于点击；落在某条鱼的位置） */
   DYN.rippleT -= dt;
   if (DYN.rippleT <= 0) {
@@ -907,3 +906,4 @@ function drawGlows(g) {
     g.globalAlpha = 1;
   }
 }
+
