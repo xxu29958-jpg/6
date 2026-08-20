@@ -146,3 +146,12 @@ function distToPoly(px, py, pts) {
   }
   return best;
 }
+
+/* Node 测试加载用导出（浏览器中本文件的顶层声明即全局，行为不变） */
+if (typeof module !== 'undefined') {
+  module.exports = {
+    TAU, clamp, lerp, smoothstep, damp, mulberry32, rng, arng, rand, arand, pick,
+    hexRgb, mixc, css, noise1, catmull, polyMeasure, polyAt, offsetPoly,
+    distPointSeg, distToPoly
+  };
+}

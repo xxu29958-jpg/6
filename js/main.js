@@ -15,6 +15,7 @@ const ASSETS = {
 };
 
 let canvas, ctx, cam;
+let COMPILED = null;      // compiled world（V4.8 物理权威 = maps/xigu/map.js 编译产物）
 let vw = 0, vh = 0, dpr = 1;
 let paused = false, lastTs = 0;
 let resizeTimer = 0;
@@ -50,9 +51,17 @@ function preload(sources, done) {
 function init() {
   canvas = document.getElementById('world');
   ctx = canvas.getContext('2d', { alpha: false });
+
+  /* V4.8：Map Definition → Compiled World（唯一物理权威；非法地图直接 throw） */
+  COMPILED = WC.compile(MAP_XIGU);
+  XB.build(COMPILED);                 // render binding 装配（物理 ← compiled）
+  LAYERS.setWorld(COMPILED.bounds);   // renderer 画幅 = compiled bounds
+
   cam = new Camera();
 
   bakeAll(ASSETS.terrain);
+  ARTCHECK.buildWaterMask(ASSETS.terrain);   // 像素水掩码 = evidence（不作物理）
+  ARTCHECK.report(COMPILED);
   initDynamic(MOBILE);
   initResidents(MOBILE);
 
@@ -81,6 +90,9 @@ function init() {
 
   lastTs = performance.now();
   requestAnimationFrame(tick);
+
+  /* 验证钩子（只读聚合，不改任何逻辑）：Playwright 探针读 cam.zoom/fx/fy 与 compiled */
+  window.__DBG = { cam, get compiled() { return COMPILED; }, WORLD_VERSION: '4.8' };
 }
 
 function tick(ts) {
@@ -111,12 +123,12 @@ function render() {
 
   /* ---- L0 插画底座（世界空间；画布原点在 (-MX,-MT)） ---- */
   cam.apply(g, dpr, parX * -4, parY * -2);
-  g.drawImage(LAYERS.ground, -WORLD.MX, -WORLD.MT, WORLD.GW, WORLD.GH);
+  g.drawImage(LAYERS.ground, -LAYERS.MX, -LAYERS.MT, LAYERS.GW, LAYERS.GH);
 
   /* ---- L0.5 远山/天空独立视差层（慢层，V4.7 位移降至 ground 的 25%） ---- */
   if (LAYERS.far) {
     cam.apply(g, dpr, parX * -1.0, parY * -0.5);
-    g.drawImage(LAYERS.far, -WORLD.MX, -WORLD.MT, LAYERS.far.width, LAYERS.far.height);
+    g.drawImage(LAYERS.far, -LAYERS.MX, -LAYERS.MT, LAYERS.far.width, LAYERS.far.height);
   }
 
   /* ---- L2 动态（世界空间） ---- */

@@ -31,13 +31,29 @@
     </svg>
   </button>
 </div>
+<!-- V4.8 三层边界：util → core/*（地图无关 World Core）→ maps/*（物理定义 + 行为配置）
+     → binding（PNG 专属渲染数据）→ render → simulation → interaction → main -->
 <script src="js/util.js"></script>
-<script src="js/world.js"></script>
-<script src="js/camera.js"></script>
-<script src="js/daynight.js"></script>
-<script src="js/layers.js"></script>
-<script src="js/dynamic.js"></script>
-<script src="js/residents.js"></script>
+<script src="js/core/geometry.js"></script>
+<script src="js/core/transform.js"></script>
+<script src="js/core/entity.js"></script>
+<script src="js/core/surface.js"></script>
+<script src="js/core/water.js"></script>
+<script src="js/core/obstacle.js"></script>
+<script src="js/core/portal.js"></script>
+<script src="js/core/navigation.js"></script>
+<script src="js/core/validation.js"></script>
+<script src="js/core/compile.js"></script>
+<script src="js/maps/xigu/map.js"></script>
+<script src="js/maps/xigu/behaviour.js"></script>
+<script src="js/maps/fixture/minimap.js"></script>
+<script src="js/render/canvas/xigu-binding.js"></script>
+<script src="js/render/canvas/layers.js"></script>
+<script src="js/render/canvas/dynamic.js"></script>
+<script src="js/render/canvas/daynight.js"></script>
+<script src="js/render/canvas/camera.js"></script>
+<script src="js/render/canvas/artcheck.js"></script>
+<script src="js/simulation/residents.js"></script>
 <script src="js/interaction.js"></script>
 <script src="js/main.js"></script>
 </body>

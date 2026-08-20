@@ -22,30 +22,37 @@ function handleClick(px, py, cam) {
     return;
   }
 
-  /* 房屋：窗光脉冲 + 门口居民探头（配准矩形判定） */
-  for (const h of WORLD.houses) {
-    if (w.x > h.x0 - 12 && w.x < h.x1 + 12 && w.y > h.y0 - 14 && w.y < h.y1 + 10) {
-      RES.peek(h);
+  /* 房屋：窗光脉冲 + 门口居民探头（判定矩形 = compiled footprint + 交互边距） */
+  for (const h of COMPILED.entitiesByTag('house')) {
+    const fp = h.footprintWorld;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const q of fp) {
+      if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0];
+      if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1];
+    }
+    if (w.x > x0 - 12 && w.x < x1 + 12 && w.y > y0 - 14 && w.y < y1 + 10) {
+      RES.peek(h.id);
       return;
     }
   }
 
-  /* 大树：sway 冲量 + 偶尔落叶（树冠判定圆 (1250,480) r250） */
-  const T = WORLD.tree.hit;
+  /* 大树：sway 冲量 + 偶尔落叶（树冠判定圆 = canopy socket world） */
+  const T = COMPILED.socketOf('tree', 'canopy');
   if (Math.hypot(w.x - T.x, w.y - T.y) < T.r) {
     treeNudge();
     return;
   }
 
-  /* 水面：涟漪 + 鱼散（polyline 距<55 或潭椭圆） */
-  const p = WORLD.pond;
+  /* 水面：涟漪 + 鱼散（水几何 authority = compiled waters；溪带判定半宽 = map def clickHalf） */
+  const p = COMPILED.waterById('pond');
   const pe = ((w.x - p.x) / p.rx) ** 2 + ((w.y - p.y) / p.ry) ** 2;
   if (pe < 1.05) {
     spawnRipple(w.x, w.y, true);
     fishScatter(w.x, w.y);
     return;
   }
-  if (distToPoly(w.x, w.y, WORLD.streamPts) < WORLD.streamHalf) {
+  const stream = COMPILED.waterById('stream');
+  if (distToPoly(w.x, w.y, stream.pts) < stream.clickHalf) {
     spawnRipple(w.x, w.y, false);
     return;
   }
