@@ -52,9 +52,10 @@ function init() {
   canvas = document.getElementById('world');
   ctx = canvas.getContext('2d', { alpha: false });
 
-  /* V4.8：Map Definition → Compiled World（唯一物理权威；非法地图直接 throw） */
-  COMPILED = WC.compile(MAP_XIGU);
-  XB.build(COMPILED);                 // render binding 装配（物理 ← compiled）
+  /* V4.9 装配线：Physical World → Render Binding → Binding Compiler
+   * → Accept/Reject → Compiled Render Scene（任何一级 throw 即拒绝启动） */
+  COMPILED = WC.compile(MAP_XIGU);    // 唯一物理权威；非法地图直接 throw
+  XB.compile(COMPILED);               // Binding Acceptance + 装配（物理 ← compiled）
   LAYERS.setWorld(COMPILED.bounds);   // renderer 画幅 = compiled bounds
 
   cam = new Camera();
@@ -92,7 +93,7 @@ function init() {
   requestAnimationFrame(tick);
 
   /* 验证钩子（只读聚合，不改任何逻辑）：Playwright 探针读 cam.zoom/fx/fy 与 compiled */
-  window.__DBG = { cam, get compiled() { return COMPILED; }, WORLD_VERSION: '4.8' };
+  window.__DBG = { cam, get compiled() { return COMPILED; }, WORLD_VERSION: '4.9' };
 }
 
 function tick(ts) {

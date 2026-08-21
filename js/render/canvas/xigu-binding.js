@@ -126,8 +126,95 @@ for (let i = 0; i < 110; i++) {
   XB.stars.push({ x: rand(0, 2048), y: rand(4, 168), r: rand(0.6, 1.5), ph: rand(TAU) });
 }
 
+/* ---------- Binding Acceptance Layer（V4.9） ----------
+ * 装配线：Physical World → Render Binding → Binding Compiler → Accept/Reject
+ *         → Compiled Render Scene。
+ * XB.validate 是纯检查（throw = Reject）；XB.compile = validate + build。
+ * 违例五类（全部 throw，不是 console.warn）：
+ *  [bind-orphan]    绑定记录指向不存在的物理实体
+ *  [bind-missing]   物理实体缺少绑定（程序化绘制实体须在 procedural 白名单）
+ *  [bind-pivot]     pivot 超出 bbox 容差（外扩 10%）
+ *  [bind-footprint] 房屋视觉宽度与物理 footprint 宽度比超出 [0.9, 1.6]
+ *  [bind-deck]      桥精灵与 deck surface 水平错位（重叠 < 60% 桥面宽）
+ * 另：实体有 footprintLocal 时校验视觉落点 |ay − footprint 底边| ≤ 40。 */
+XB.procedural = ['swing'];               // 程序化绘制、无 PNG 的实体白名单
+
+XB.validate = function (compiled) {
+  /* A. orphan binding：绑定 → 实体 */
+  for (const entId of Object.keys(XB.entities)) {
+    if (!compiled.entities[entId]) {
+      throw new Error('[bind-orphan] 绑定记录指向不存在的实体: ' + entId);
+    }
+  }
+  /* B. missing binding：实体 → 绑定（procedural 白名单除外） */
+  for (const entId of Object.keys(compiled.entities)) {
+    if (!XB.entities[entId] && XB.procedural.indexOf(entId) < 0) {
+      throw new Error('[bind-missing] 物理实体缺少渲染绑定: ' + entId +
+        '（程序化绘制请加入 XB.procedural 白名单）');
+    }
+  }
+  for (const entId of Object.keys(XB.entities)) {
+    const b = XB.entities[entId];
+    const ent = compiled.entities[entId];
+    const bbox = XB.images[b.img].bbox;
+    const bw = bbox[2] - bbox[0], bh = bbox[3] - bbox[1];
+    /* C. pivot 合理性（容差 = bbox 外扩 10%；历史量测允许贴边） */
+    if (b.pivot) {
+      const mx = bw * 0.1, my = bh * 0.1;
+      if (b.pivot[0] < bbox[0] - mx || b.pivot[0] > bbox[2] + mx ||
+          b.pivot[1] < bbox[1] - my || b.pivot[1] > bbox[3] + my) {
+        throw new Error('[bind-pivot] ' + entId + ' pivot (' + b.pivot +
+          ') 超出 bbox [' + bbox + '] 外扩 10% 容差');
+      }
+    }
+    /* D. 房屋：视觉宽度 ↔ 物理 footprint 宽度 */
+    if (ent.tags.indexOf('house') >= 0 && ent.footprintWorld && ent.footprintWorld.length) {
+      let fx0 = Infinity, fx1 = -Infinity, fy1 = -Infinity;
+      for (const q of ent.footprintWorld) {
+        if (q[0] < fx0) fx0 = q[0]; if (q[0] > fx1) fx1 = q[0];
+        if (q[1] > fy1) fy1 = q[1];
+      }
+      const ratio = b.w / (fx1 - fx0);
+      if (ratio < 0.9 || ratio > 1.6) {
+        throw new Error('[bind-footprint] ' + entId + ' 视觉宽 ' + b.w +
+          ' 与物理 footprint 宽 ' + (fx1 - fx0) + ' 比 ' + ratio.toFixed(2) + ' 超出 [0.9,1.6]');
+      }
+      /* F. 视觉落点（ay = transform.y）应落在物理 footprint 底边附近 */
+      if (Math.abs(ent.transform.y - fy1) > 40) {
+        throw new Error('[bind-footprint] ' + entId + ' 视觉落点 y=' + ent.transform.y +
+          ' 偏离 footprint 底边 y=' + fy1 + ' 超过 40');
+      }
+    }
+    /* E. 桥：精灵水平跨度必须压住 deck surface（≥60% 桥面宽） */
+    if (ent.tags.indexOf('bridge') >= 0) {
+      let deck = null;
+      for (const s of compiled.surfaces) {
+        if (s.entity === entId && s.tags.indexOf('deck') >= 0) { deck = s; break; }
+      }
+      if (!deck) throw new Error('[bind-deck] ' + entId + ' 缺少实体拥有的 deck surface');
+      let dx0 = Infinity, dx1 = -Infinity;
+      for (const q of deck.polygon) { if (q[0] < dx0) dx0 = q[0]; if (q[0] > dx1) dx1 = q[0]; }
+      const sx0 = ent.transform.x - b.w / 2, sx1 = ent.transform.x + b.w / 2;
+      const ov = Math.min(sx1, dx1) - Math.max(sx0, dx0);
+      if (ov < (dx1 - dx0) * 0.6) {
+        throw new Error('[bind-deck] ' + entId + ' 精灵 [' + sx0 + ',' + sx1 +
+          '] 与 deck [' + dx0 + ',' + dx1 + '] 水平重叠 ' + Math.round(ov) + ' < 60% 桥面宽');
+      }
+    }
+  }
+  return true;
+};
+
+/* Binding Compiler：validate（Accept）→ build → Compiled Render Scene */
+XB.compile = function (compiled) {
+  XB.validate(compiled);
+  XB.build(compiled);
+  return { assets: XB.assets, dynAssets: XB.dynAssets, staticAssets: XB.staticAssets };
+};
+
 /* compiled world + 本 binding → 渲染资产表（旧 WORLD.assets 同构记录：
-   ax/ay 来自实体 transform（物理），s/h/bw/bh 派生；改 binding 不动物理） */
+   ax/ay 来自实体 transform（物理），s/h/bw/bh 派生；改 binding 不动物理）
+   注意：外部装配一律走 XB.compile（先 Acceptance）；XB.build 为内部步骤。 */
 XB.build = function (compiled) {
   const assets = [];
   for (const entId of Object.keys(compiled.entities)) {

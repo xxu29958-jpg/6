@@ -43,7 +43,8 @@ function handleClick(px, py, cam) {
     return;
   }
 
-  /* 水面：涟漪 + 鱼散（水几何 authority = compiled waters；溪带判定半宽 = map def clickHalf） */
+  /* 水面：涟漪 + 鱼散（水几何 authority = compiled waters；
+   * 溪带判定半宽 = behaviour.interaction.streamClickHalf，交互参数不属水物理） */
   const p = COMPILED.waterById('pond');
   const pe = ((w.x - p.x) / p.rx) ** 2 + ((w.y - p.y) / p.ry) ** 2;
   if (pe < 1.05) {
@@ -52,7 +53,9 @@ function handleClick(px, py, cam) {
     return;
   }
   const stream = COMPILED.waterById('stream');
-  if (distToPoly(w.x, w.y, stream.pts) < stream.clickHalf) {
+  const streamHalf = (typeof BEHAVIOUR_XIGU !== 'undefined' &&
+    BEHAVIOUR_XIGU.interaction && BEHAVIOUR_XIGU.interaction.streamClickHalf) || 60;
+  if (distToPoly(w.x, w.y, stream.pts) < streamHalf) {
     spawnRipple(w.x, w.y, false);
     return;
   }
