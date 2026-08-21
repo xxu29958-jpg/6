@@ -3,9 +3,12 @@
 /* ============================================================
  * core/entity.js — World Core：可定位实体
  * entity def = { id, transform, footprintLocal:[[x,y]..], sockets:{name:{x,y,r?,..}},
- *                zones:{name:{x0,x1,y,dy?}|{x0,y0,x1,y1}}, props:{}, tags:[] }
- * 任何可定位实体只有一个世界 transform；footprint/socket/zone 全部 local，
+ *                zones:{name:{x0,x1,y,dy?}|{x0,y0,x1,y1}}, props:{}, tags:[],
+ *                solids:[{id, tags:[], polygon:[[x,y]..](local)}] }
+ * 任何可定位实体只有一个世界 transform；footprint/socket/zone/solid 全部 local，
  * world 坐标由 compile 期派生（本模块），移动 transform 即整体跟随。
+ * solids = 实体拥有的物理碰撞体（如屋身/树根/篱石）：与 footprint 分离声明，
+ * 因为碰撞几何通常 ⊊ 足迹（磨坊屋身只占 footprint 上段）。
  * ============================================================ */
 const E = {};
 
@@ -36,6 +39,14 @@ E.zoneWorld = function (ent, z) {
   return out;
 };
 
+/* local polygon → world（solids 用，与 footprintWorld 同一 transform 路径） */
+E.polyWorld = function (ent, poly) {
+  return poly.map(function (p) {
+    const w = WC.transform.apply(ent.transform, p[0], p[1]);
+    return [w.x, w.y];
+  });
+};
+
 /* entity def → 派生实体（compile 产物的一部分，非权威） */
 E.derive = function (def) {
   const ent = {
@@ -51,6 +62,10 @@ E.derive = function (def) {
   for (const k of Object.keys(def.sockets || {})) ent.socketsWorld[k] = E.socketWorld(ent, def.sockets[k]);
   ent.zonesWorld = {};
   for (const k of Object.keys(def.zones || {})) ent.zonesWorld[k] = E.zoneWorld(ent, def.zones[k]);
+  /* 实体拥有的物理碰撞体：local 声明 → world 派生（保持 solid.id，测试可追溯） */
+  ent.solidsWorld = (def.solids || []).map(function (s) {
+    return { id: s.id, owner: def.id, tags: s.tags || [], polygon: E.polyWorld(ent, s.polygon) };
+  });
   return ent;
 };
 

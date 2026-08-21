@@ -3,17 +3,20 @@
 /* ============================================================
  * core/water.js — World Core：水体几何 authority
  * water = { id, kind, tags? }，kind ∈
- *   'ribbon'  : { ctrl:[[x,y]..], half:[每控制点半宽], per?, clickHalf? } —— 折线带
+ *   'ribbon'  : { ctrl:[[x,y]..], half:[每控制点半宽], per? } —— 折线带
  *   'ellipse' : { x, y, rx, ry }
  *   'disc'    : { x, y, r }
  *   'rect'    : { x0, y0, x1, y1 }
  * Renderer 依此画水；任何像素掩码无权反控物理（仅可作 art-vs-world evidence）。
+ * 注意：点击判定半宽（clickHalf）是交互参数，不是水物理——core 拒绝持有，
+ * 一律驻留地图 behaviour 配置（interaction.*），prepare 阶段即剥离。
  * ============================================================ */
 const W = {};
 
 /* compile 期准备：ribbon 加密折线 + 测度 + 每密点半宽（控制点线性插值） */
 W.prepare = function (def) {
   const w = Object.assign({}, def);
+  delete w.clickHalf;              // 交互参数不属于 core 水结构（见 behaviour.interaction）
   if (def.kind === 'ribbon') {
     const per = def.per || 10;
     w.per = per;
@@ -36,7 +39,7 @@ W.contains = function (w, x, y) {
     case 'ribbon': {
       const pts = w.pts;
       for (let i = 0; i < pts.length - 1; i++) {
-        if (WC.geometry.distPointSeg(x, y, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]) < W.ribbonHalf(w, i)) return true;
+        if (WC.geometry.distPointSeg(x, y, pts[i][0], pts[i][1], pts[i + 1][1]) < W.ribbonHalf(w, i)) return true;
       }
       return false;
     }

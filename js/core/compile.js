@@ -16,16 +16,36 @@ function compile(mapDef) {
     entities[ed.id] = WC.entity.derive(ed);
   }
 
-  /* ---- surfaces / waters / obstacles（polygon 已是世界坐标，原样持有） ---- */
+  /* ---- surfaces：世界固定地形 polygon 原样持有；
+   *      entity 引用的 surface（如桥面 deck）polygon 为实体 local 坐标，
+   *      world polygon 与 occlusion.sortY 全部由实体 transform 派生（跟随移动） ---- */
   const surfaces = mapDef.surfaces.map(function (s) {
-    return { id: s.id, polygon: s.polygon, walkable: s.walkable !== false,
+    let polygon = s.polygon, occlusion = s.occlusion || null;
+    if (s.entity) {
+      const ent = entities[s.entity];
+      if (!ent) throw new Error('[compile] surface "' + s.id + '" 引用不存在的实体 ' + s.entity);
+      polygon = WC.entity.polyWorld(ent, s.polygon);
+      if (occlusion) {
+        const sc = WC.transform.scaleOf(ent.transform);
+        occlusion = { sortY: ent.transform.y + (occlusion.sortYLocal || 0) * sc };
+      }
+    }
+    return { id: s.id, polygon: polygon, walkable: s.walkable !== false,
       elevation: s.elevation || 0, cost: s.cost == null ? 1 : s.cost,
-      tags: s.tags || [], occlusion: s.occlusion || null };
+      tags: s.tags || [], occlusion: occlusion,
+      entity: s.entity || null };
   });
   const waters = mapDef.waters.map(function (w) { return WC.water.prepare(w); });
+  /* ---- obstacles：世界固定的（悬崖等）原样持有 + 实体 solids 派生并入；
+   *      按 id 排序保证 compiled 顺序与声明顺序无关（稳定 hash/命中确定） ---- */
   const obstacles = (mapDef.obstacles || []).map(function (o) {
-    return { id: o.id, polygon: o.polygon, tags: o.tags || [] };
+    return { id: o.id, polygon: o.polygon, tags: o.tags || [], owner: null };
   });
+  for (const eid of Object.keys(entities)) {
+    const solids = entities[eid].solidsWorld || [];
+    for (const so of solids) obstacles.push({ id: so.id, polygon: so.polygon, tags: so.tags, owner: eid });
+  }
+  obstacles.sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
 
   /* ---- portal：socket 引用解析为 at（跟随实体 transform） ---- */
   const portals = (mapDef.portals || []).map(function (p) {
