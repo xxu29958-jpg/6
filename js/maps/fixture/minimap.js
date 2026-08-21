@@ -5,8 +5,8 @@
  * 通用性证明：与溪谷共用同一套 World Core 完成 compile /
  * socket 派生 / Dijkstra / 水拒绝 / 障碍拒绝 / portal 跨水 / elevation 校验。
  * 内容：两块 walkable 台地（elev 0 / 1）+ 一条不可直接穿越的水渠
- * + 一座桥（entity + deck surface + 2 portal）+ 一个 house + 一个 obstacle
- * + 一个 elevation transition（坡道 portal）。
+ * + 一座桥（entity 单 owner：deck surface + 2 portal 全 local）+ 一个 house
+ * + 一个世界固定 obstacle + 一个 elevation transition（坡道 portal）。
  * ============================================================ */
 
 const MAP_FIXTURE_MINI = {
@@ -20,17 +20,18 @@ const MAP_FIXTURE_MINI = {
     /* 东台地（elev 1，x≥230 的高台） */
     { id: 'east', elevation: 1, walkable: true,
       polygon: [[230, 60], [400, 60], [400, 260], [230, 260]] },
-    /* 桥面（跨水渠，elev 0；含两端引道压境段，比水渠宽） */
-    { id: 'miniDeck', elevation: 0, walkable: true, tags: ['deck'],
-      occlusion: { sortY: 160 },
-      polygon: [[160, 132], [240, 132], [240, 168], [160, 168]] }
+    /* 桥面（跨水渠，elev 0；含两端引道压境段，比水渠宽）
+     * miniBridge 实体 local 坐标——deck/sortY 随 bridge transform 派生 */
+    { id: 'miniDeck', entity: 'miniBridge', elevation: 0, walkable: true, tags: ['deck'],
+      occlusion: { sortYLocal: -8 },
+      polygon: [[-40, -36], [40, -36], [40, 0], [-40, 0]] }
   ],
 
   waters: [
     /* 竖直水渠 x≈200，半宽 18（不经桥不可过） */
     { id: 'channel', kind: 'ribbon',
       ctrl: [[200, 20], [200, 120], [200, 220], [200, 290]],
-      half: [18, 18, 18, 18], per: 8, clickHalf: 22 }
+      half: [18, 18, 18, 18], per: 8 }
   ],
 
   obstacles: [
@@ -46,16 +47,17 @@ const MAP_FIXTURE_MINI = {
         win0: { x: -12, y: -22, th: 0.4 },
         chimney: { x: -10, y: -46 }
       } },
-    /* 桥实体：transform + deck surface + 两端 portal */
-    { id: 'miniBridge', transform: { x: 200, y: 168 }, tags: ['bridge'] },
+    /* 桥实体：单 owner——deck surface（surfaces）+ 两端 portal（socket 引用）全 local */
+    { id: 'miniBridge', transform: { x: 200, y: 168 }, tags: ['bridge'],
+      sockets: { west: { x: -40, y: -18 }, east: { x: 40, y: -18 } } },
     { id: 'lamp1', transform: { x: 120, y: 150 }, tags: ['lantern'],
       sockets: { head: { x: 8, y: -30 } } }
   ],
 
   portals: [
-    { id: 'miniBridgeW', at: { x: 160, y: 150 }, r: 30, connects: ['west', 'miniDeck'],
+    { id: 'miniBridgeW', socket: ['miniBridge', 'west'], r: 30, connects: ['west', 'miniDeck'],
       elevations: [0, 0], crossesWater: true, tags: ['deck-end'] },
-    { id: 'miniBridgeE', at: { x: 240, y: 150 }, r: 30, connects: ['miniDeck', 'west'],
+    { id: 'miniBridgeE', socket: ['miniBridge', 'east'], r: 30, connects: ['miniDeck', 'west'],
       elevations: [0, 0], crossesWater: true, tags: ['deck-end'] },
     /* 台地坡道：elev 0→1 在桥东堍上岸处 */
     { id: 'ramp', at: { x: 244, y: 150 }, r: 30, connects: ['west', 'east'],

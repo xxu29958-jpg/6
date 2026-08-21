@@ -3,10 +3,14 @@
 /* ============================================================
  * maps/xigu/behaviour.js — 溪谷地图侧行为配置
  * simulation/residents.js 的地图语义参数：家节点映射 / 桥边坐姿常驻 /
- * 秋千调度 / 夜间规则。物理查询一律走 compiled world，这里只有配置。
+ * 秋千调度 / 夜间规则；interaction.js 的点击判定参数。
+ * 物理查询一律走 compiled world，这里只有配置。
  * ============================================================ */
 const BEHAVIOUR_XIGU = {
   counts: { desktop: 14, mobile: 10 },     // 居民总数
+  interaction: {
+    streamClickHalf: 60                    // 溪带点击判定半宽（交互参数，非水物理）
+  },
   homes: ['A', 'H', 'J'],                  // 家节点轮转（磨坊/右屋/左屋）
   sitterIndex: 0,                          // 桥边常驻坐姿者
   lanternIndex: 1,                         // 夜晚提灯者
