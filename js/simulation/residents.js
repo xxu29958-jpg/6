@@ -10,9 +10,18 @@
  * COMPILED（maps/xigu/map.js 编译产物）；路由 = 手写 Dijkstra（无 BFS）；
  * onBridge 布尔物理删除，改由当前 route segment 的 deck 成员推导（_deck）。
  * 地图侧行为参数在 maps/xigu/behaviour.js（BH）。
+ * V4.9 运行期不变量：snap-to-node / final 直线段在产生前过 compile 级
+ * validateRoute——非法段根本不会成为路线（不是「走一半被发现」）；
+ * 被拦截时 console.error + 合法传送兜底（目标点均经 compile 校验）。
  * ============================================================ */
 
 const BH = (typeof BEHAVIOUR_XIGU !== 'undefined') ? BEHAVIOUR_XIGU : null;
+
+/* 运行期段校验：throw → 拦截 + 报错；返回 false 由调用方做合法兜底 */
+function validatedSeg(pts, label) {
+  try { WC.validation.validateRoute(COMPILED, pts, label); return true; }
+  catch (e) { console.error('[residents] 非法段已拦截: ' + e.message); return false; }
+}
 
 const RES = {
   list: [],
@@ -86,15 +95,29 @@ class Resident {
 
   /* 沿路网到目标节点（手写 Dijkstra 最短路），可选最后一段直线 */
   routeTo(goal, final, gohome) {
-    const near = WC.navigation.nearestNode(COMPILED.nav, this.x, this.y);
-    const nn = COMPILED.nav.nodes[near];
+    /* V4.9 snap 不变量：snap 目标 = 距离升序首个「直线段过 validateRoute」的节点
+     * （纯最近节点可能隔着崖带/屋墙）；全部候选非法 → 传送到最近节点
+     * （合法点，compile 校验过），任何情况下非法直线都不会成为 route。 */
+    const cands = Object.keys(COMPILED.nav.nodes)
+      .map(id => ({ id: id, n: COMPILED.nav.nodes[id] }))
+      .sort((p, q) => Math.hypot(p.n.x - this.x, p.n.y - this.y) - Math.hypot(q.n.x - this.x, q.n.y - this.y));
+    let near = cands[0].id, nn = cands[0].n, snapped = false;
+    for (const cand of cands) {
+      if (Math.hypot(cand.n.x - this.x, cand.n.y - this.y) <= 6 ||
+          validatedSeg([[this.x, this.y], [cand.n.x, cand.n.y]], 'snap>' + cand.id)) {
+        near = cand.id; nn = cand.n; snapped = true; break;
+      }
+    }
+    if (!snapped) {
+      console.error('[residents] 无合法 snap 候选，合法传送兜底 → ' + near);
+      this.x = nn.x; this.y = nn.y;
+    }
     const sp = WC.navigation.dijkstra(COMPILED.nav, near, goal);
     this.hops = sp ? sp.path.slice(1) : [];
     this.final = final || null;
     this.goingHome = !!gohome;
     if (Math.hypot(nn.x - this.x, nn.y - this.y) > 6) {
-      /* 先直线回最近节点（合法性 = compile 期 extraRoutes + 运行期干岸断言） */
-      this.route = [[this.x, this.y], [nn.x, nn.y]];
+      this.route = [[this.x, this.y], [nn.x, nn.y]];   // 已验证合法的 snap 段
       this.ri = 1; this.dest = near; this._deck = false; this.carry = false;
       this.state = 'walk';
     } else if (this.hops.length) {
@@ -109,6 +132,11 @@ class Resident {
   beginFinal() {
     if (!this.final) return;
     const f = this.final; this.final = null;
+    /* final 直线段同样先过 validateRoute；被拦截 → 传送到 final 终点
+     * （zone/socket 终点经 compile 期 extraRoutes 校验为合法可达） */
+    if (!validatedSeg([[this.x, this.y], [f.x, f.y]], 'final>' + (f.state || 'point'))) {
+      this.x = f.x; this.y = f.y;
+    }
     this.route = [[this.x, this.y], [f.x, f.y]];
     this.ri = 1; this.dest = null; this._deck = false; this.carry = false;
     this.finalState = f.state;
