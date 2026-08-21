@@ -63,7 +63,7 @@ function stableHash(compiled) {
     })),
     waters: compiled.waters.map(w => {
       const o = { id: w.id, kind: w.kind };
-      for (const k of ['ctrl', 'half', 'per', 'clickHalf', 'x', 'y', 'rx', 'ry', 'r', 'x0', 'y0', 'x1', 'y1']) {
+      for (const k of ['ctrl', 'half', 'per', 'x', 'y', 'rx', 'ry', 'r', 'x0', 'y0', 'x1', 'y1']) {
         if (w[k] !== undefined) o[k] = w[k];
       }
       return o;
@@ -76,7 +76,8 @@ function stableHash(compiled) {
     entities: Object.keys(compiled.entities).sort().map(id => {
       const e = compiled.entities[id];
       return { id: id, transform: e.transform, footprintWorld: e.footprintWorld,
-        socketsWorld: e.socketsWorld, zonesWorld: e.zonesWorld, tags: e.tags, props: e.props };
+        socketsWorld: e.socketsWorld, zonesWorld: e.zonesWorld, solidsWorld: e.solidsWorld,
+        tags: e.tags, props: e.props };
     }),
     zones: compiled.zones,
     nav: {
